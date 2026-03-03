@@ -29,8 +29,8 @@ Given an origin and destination, it returns:
 ### 1. Clone and create virtualenv
 
 ```bash
-git clone <repo-url>
-cd assignment3
+git clone fuel-planner
+cd fuel-planner
 
 python3 -m venv venv
 source venv/bin/activate       # Windows: venv\Scripts\activate
