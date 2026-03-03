@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fuel Route Planner</title>
+
+  <!-- Leaflet CSS (interactive map) -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    crossorigin=""
+  />
+  {% load static %}
+  <link rel="stylesheet" href="{% static 'css/main.css' %}" />
+</head>
+<body>
+  <div class="app-container">
+
+    <!-- ── Sidebar ─────────────────────────────────── -->
+    <aside class="sidebar">
+      <h1 class="logo">⛽ Fuel Route Planner</h1>
+
+      <form id="route-form" novalidate>
+        <label for="origin">Origin</label>
+        <input
+          id="origin"
+          type="text"
+          placeholder="e.g. Chicago, IL"
+          required
+          autocomplete="off"
+        />
+
+        <label for="destination">Destination</label>
+        <input
+          id="destination"
+          type="text"
+          placeholder="e.g. Los Angeles, CA"
+          required
+          autocomplete="off"
+        />
+
+        <div class="row">
+          <div class="field">
+            <label for="mpg">MPG</label>
+            <input id="mpg" type="number" value="10" min="1" max="200" step="0.1" />
+          </div>
+          <div class="field">
+            <label for="range">Tank Range (mi)</label>
+            <input id="range" type="number" value="500" min="100" max="1500" step="10" />
+          </div>
+        </div>
+
+        <button type="submit" id="submit-btn">Find Cheapest Route</button>
+      </form>
+
+      <!-- Summary card (hidden until a route is loaded) -->
+      <div id="summary-card" class="summary-card hidden">
+        <h2>Trip Summary</h2>
+        <div class="stat-grid">
+          <div class="stat">
+            <span class="stat-label">Distance</span>
+            <span class="stat-value" id="stat-distance">—</span>
+          </div>
+          <div class="stat">
+            <span class="stat-label">Fuel Cost</span>
+            <span class="stat-value" id="stat-cost">—</span>
+          </div>
+          <div class="stat">
+            <span class="stat-label">Gallons</span>
+            <span class="stat-value" id="stat-gallons">—</span>
+          </div>
+          <div class="stat">
+            <span class="stat-label">Stops</span>
+            <span class="stat-value" id="stat-stops">—</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Fuel stop list -->
+      <div id="stop-list" class="stop-list"></div>
+
+      <div id="error-box" class="error-box hidden"></div>
+
+      <div class="api-links">
+        <a href="/api/docs/" target="_blank">📄 Swagger UI</a>
+        <a href="/api/redoc/" target="_blank">📘 ReDoc</a>
+        <a href="/api/schema/" target="_blank">⚙ OpenAPI JSON</a>
+      </div>
+    </aside>
+
+    <!-- ── Map ──────────────────────────────────────── -->
+    <main id="map"></main>
+  </div>
+
+  <!-- Leaflet JS -->
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    crossorigin=""
+  ></script>
+  <script src="{% static 'js/app.js' %}"></script>
+</body>
+</html>

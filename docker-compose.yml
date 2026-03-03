@@ -1,0 +1,38 @@
+services:
+  # ── Django app (ASGI via uvicorn for full async support) ──────────────────
+  web:
+    build: .
+    command: >
+      sh -c "python manage.py migrate --run-syncdb &&
+             python manage.py collectstatic --noinput &&
+             uvicorn fuel_finder.asgi:application --host 0.0.0.0 --port 8000 --workers 2"
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql://fuel_user:fuel_pass@db:5432/fuel_db
+      - OSRM_BASE_URL=http://router.project-osrm.org
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # ── PostgreSQL ─────────────────────────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: fuel_db
+      POSTGRES_USER: fuel_user
+      POSTGRES_PASSWORD: fuel_pass
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fuel_user -d fuel_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:

@@ -1,0 +1,210 @@
+/* ── Reset & base ───────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  font-size: 14px;
+  background: #f0f2f5;
+  color: #1a1a2e;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ── Layout ─────────────────────────────────────────────── */
+.app-container {
+  display: flex;
+  height: 100vh;
+}
+
+.sidebar {
+  width: 360px;
+  min-width: 320px;
+  background: #fff;
+  box-shadow: 2px 0 12px rgba(0,0,0,.10);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 22px 18px;
+  overflow-y: auto;
+  z-index: 1000;
+}
+
+#map {
+  flex: 1;
+  height: 100%;
+}
+
+/* ── Logo ───────────────────────────────────────────────── */
+.logo {
+  font-size: 18px;
+  font-weight: 700;
+  color: #0f3460;
+  letter-spacing: -.3px;
+}
+
+/* ── Form ───────────────────────────────────────────────── */
+#route-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  color: #555;
+  margin-bottom: 2px;
+}
+
+input[type="text"],
+input[type="number"] {
+  width: 100%;
+  padding: 9px 11px;
+  border: 1.5px solid #d0d5e0;
+  border-radius: 8px;
+  font-size: 14px;
+  outline: none;
+  transition: border-color .2s;
+}
+
+input:focus {
+  border-color: #0f3460;
+}
+
+.row {
+  display: flex;
+  gap: 10px;
+}
+.field { flex: 1; display: flex; flex-direction: column; }
+
+button[type="submit"] {
+  margin-top: 4px;
+  padding: 11px;
+  background: #0f3460;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .2s;
+}
+
+button[type="submit"]:hover { background: #16213e; }
+button[type="submit"]:disabled { background: #90a4ae; cursor: not-allowed; }
+
+/* ── Summary card ───────────────────────────────────────── */
+.summary-card {
+  background: #0f3460;
+  border-radius: 10px;
+  padding: 14px 16px;
+  color: #fff;
+}
+
+.summary-card h2 {
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  margin-bottom: 10px;
+  opacity: .8;
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.stat { display: flex; flex-direction: column; }
+.stat-label { font-size: 10px; opacity: .7; text-transform: uppercase; letter-spacing: .5px; }
+.stat-value { font-size: 17px; font-weight: 700; margin-top: 2px; }
+
+/* ── Fuel stop list ─────────────────────────────────────── */
+.stop-list { display: flex; flex-direction: column; gap: 8px; }
+
+.stop-card {
+  background: #f8f9fc;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 9px;
+  padding: 11px 13px;
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+}
+
+.stop-card:hover {
+  border-color: #0f3460;
+  background: #eef2ff;
+}
+
+.stop-card .stop-name {
+  font-weight: 600;
+  font-size: 13px;
+  color: #0f3460;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stop-card .stop-location {
+  font-size: 11px;
+  color: #666;
+  margin-top: 2px;
+}
+
+.stop-card .stop-meta {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 7px;
+  font-size: 12px;
+}
+
+.stop-meta .price { color: #e53e3e; font-weight: 700; }
+.stop-meta .cost  { color: #276749; font-weight: 600; }
+.stop-meta .gals  { color: #555; }
+
+/* ── Error ──────────────────────────────────────────────── */
+.error-box {
+  background: #fff5f5;
+  border: 1.5px solid #fc8181;
+  border-radius: 8px;
+  padding: 10px 13px;
+  color: #c53030;
+  font-size: 13px;
+}
+
+/* ── Utilities ──────────────────────────────────────────── */
+.hidden { display: none !important; }
+
+.api-links {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding-top: 6px;
+  border-top: 1px solid #e2e8f0;
+  margin-top: auto;
+}
+
+.api-links a {
+  font-size: 11px;
+  color: #0f3460;
+  text-decoration: none;
+  padding: 4px 8px;
+  border: 1px solid #d0d5e0;
+  border-radius: 5px;
+  transition: background .15s;
+}
+
+.api-links a:hover {
+  background: #eef2ff;
+  border-color: #0f3460;
+}
+
+/* ── Responsive ─────────────────────────────────────────── */
+@media (max-width: 680px) {
+  .app-container { flex-direction: column; }
+  .sidebar { width: 100%; max-height: 50vh; }
+  #map { height: 50vh; }
+}
