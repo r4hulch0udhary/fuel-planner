@@ -76,3 +76,13 @@ class RouteResponseSerializer(serializers.Serializer):
         child=serializers.ListField(child=serializers.FloatField()),
         help_text="GeoJSON LineString coordinates [[lon, lat], ...].",
     )
+    tank_range_miles = serializers.FloatField(
+        help_text="Tank range used for this request (miles).",
+    )
+    mpg = serializers.FloatField(
+        help_text="MPG used for this request.",
+    )
+    warning = serializers.CharField(
+        allow_blank=True,
+        help_text="Non-empty when the route could not be fully planned (e.g. tank range too small).",
+    )

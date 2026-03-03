@@ -1,8 +1,14 @@
 """
-Router app — async views.
+Router app — views.
 
-All views are fully async using Django's native async view support.
-DB access uses sync_to_async so we never block the event loop.
+drf-spectacular requires DRF's APIView / @api_view so it can introspect
+the schema.  DRF's dispatch loop is synchronous, so async def methods
+return a coroutine instead of a Response — crashing at finalize_response.
+
+Solution: the public DRF handler methods (get / post) are *synchronous*
+but immediately delegate to private async coroutines using
+``asgiref.sync.async_to_sync``.  This preserves full async I/O on ASGI
+(all awaits run inside the same event loop) while keeping DRF happy.
 
 Endpoints:
   POST /api/route/  → compute optimal fuel stops for a route
@@ -15,16 +21,15 @@ API docs:
 
 from __future__ import annotations
 
-import json
 import asyncio
 import logging
 from dataclasses import asdict
 
-from asgiref.sync import sync_to_async
-from django.http import JsonResponse
-from django.views import View
-from django.utils.decorators import method_decorator
-from django.views.decorators.csrf import csrf_exempt
+from asgiref.sync import async_to_sync, sync_to_async
+from rest_framework.decorators import api_view
+from rest_framework.request import Request
+from rest_framework.response import Response
+from rest_framework.views import APIView
 from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiExample
 
 from stations.models import FuelStation
@@ -60,17 +65,17 @@ logger = logging.getLogger(__name__)
         )
     },
 )
-async def health_check(request):  # noqa: ANN001
+@api_view(["GET"])
+def health_check(request: Request) -> Response:
     """
     GET /api/health/
 
     Simple liveness probe. Returns the count of geocoded stations
     so you can verify the import_stations command has been run.
     """
-    count = await sync_to_async(
-        FuelStation.objects.filter(latitude__isnull=False).count
-    )()
-    return JsonResponse({"status": "ok", "geocoded_stations": count}, status=200)
+    # Synchronous ORM count — fast single scalar query.
+    count = FuelStation.objects.filter(latitude__isnull=False).count()
+    return Response({"status": "ok", "geocoded_stations": count})
 
 
 # ---------------------------------------------------------------------------
@@ -78,8 +83,7 @@ async def health_check(request):  # noqa: ANN001
 # ---------------------------------------------------------------------------
 
 
-@method_decorator(csrf_exempt, name="dispatch")
-class RouteView(View):
+class RouteView(APIView):
     """
     POST /api/route/
 
@@ -92,12 +96,12 @@ class RouteView(View):
             "tank_range_miles": 500
         }
 
-    Execution pipeline (fully async, ~1–2 external API calls total):
-      1. Validate input (sync serializer, no I/O).
-      2. Geocode origin + destination concurrently (2 async calls).
-      3. Fetch OSRM route   (1 async HTTP call).
+    Execution pipeline:
+      1. Validate input (DRF serializer).
+      2. Geocode origin + destination concurrently (2 async HTTP calls).
+      3. Fetch OSRM driving route (1 async HTTP call).
       4. Load geocoded stations from DB (async ORM).
-      5. Run in-memory optimizer (pure Python/NumPy, no I/O).
+      5. Run in-memory greedy fuel optimizer (pure NumPy, no I/O).
       6. Return JSON.
     """
 
@@ -106,8 +110,8 @@ class RouteView(View):
         summary="Compute cheapest fuel stop plan",
         description=(
             "Given an origin and destination within the USA, returns the optimal "
-            "(cheapest) set of fuel stops so the vehicle never runs out of fuel "
-            "(max 500-mile tank range, 10 mpg by default). "
+            "(cheapest) set of fuel stops so the vehicle never runs out of fuel. "
+            "Uses a 500-mile tank range and 10 mpg by default. "
             "Makes exactly **one** call to the OSRM routing API. "
             "Fuel stop selection uses a greedy look-ahead algorithm over "
             "pre-geocoded OPIS station data."
@@ -141,18 +145,32 @@ class RouteView(View):
             ),
         ],
     )
-    async def post(self, request, *args, **kwargs):  # noqa: ANN001
-        """Handle POST request for route optimization."""
+    def post(self, request: Request, *args, **kwargs) -> Response:
+        """
+        Handle POST /api/route/.
 
-        # -- 1. Parse & validate request body --
-        try:
-            body = json.loads(request.body)
-        except json.JSONDecodeError:
-            return JsonResponse({"error": "Invalid JSON body."}, status=400)
+        DRF's dispatch is synchronous — we delegate immediately to the
+        private async implementation via async_to_sync so that all I/O
+        (geocoding, OSRM, DB) still runs fully async on the ASGI event loop.
+        """
+        return async_to_sync(self._async_post)(request)
 
-        serializer = RouteRequestSerializer(data=body)
+    # ------------------------------------------------------------------
+    # Private async implementation
+    # ------------------------------------------------------------------
+
+    async def _async_post(self, request: Request) -> Response:
+        """
+        Full async pipeline for route optimisation.
+
+        Kept private so drf-spectacular only introspects the public ``post``
+        method above (which carries the @extend_schema decorator).
+        """
+
+        # -- 1. Validate request body --
+        serializer = RouteRequestSerializer(data=request.data)
         if not serializer.is_valid():
-            return JsonResponse({"errors": serializer.errors}, status=400)
+            return Response({"errors": serializer.errors}, status=400)
 
         data = serializer.validated_data
         origin_str: str = data["origin"]
@@ -167,15 +185,15 @@ class RouteView(View):
                 geocode_address(destination_str),
             )
         except ValueError as exc:
-            return JsonResponse({"error": str(exc)}, status=400)
+            return Response({"error": str(exc)}, status=400)
         except Exception as exc:  # noqa: BLE001
             logger.exception("Geocoding failed: %s", exc)
-            return JsonResponse(
+            return Response(
                 {"error": "Geocoding service unavailable. Try again."},
                 status=503,
             )
 
-        # -- 3. Fetch route from OSRM (single HTTP call) --
+        # -- 3. Fetch driving route from OSRM (single HTTP call) --
         osrm = OSRMService()
         try:
             route = await osrm.get_route(
@@ -186,12 +204,12 @@ class RouteView(View):
             )
         except Exception as exc:  # noqa: BLE001
             logger.exception("OSRM routing failed: %s", exc)
-            return JsonResponse(
+            return Response(
                 {"error": "Routing service unavailable. Try again."},
                 status=503,
             )
 
-        # -- 4. Load all geocoded stations from DB (async) --
+        # -- 4. Load all geocoded stations from DB --
         stations_qs = await sync_to_async(
             lambda: list(
                 FuelStation.objects.filter(
@@ -220,7 +238,7 @@ class RouteView(View):
         )
 
         # -- 6. Serialize and return --
-        return JsonResponse(
+        return Response(
             {
                 "origin": result.origin,
                 "destination": result.destination,
@@ -229,8 +247,8 @@ class RouteView(View):
                 "total_gallons": result.total_gallons,
                 "fuel_stops": [asdict(stop) for stop in result.fuel_stops],
                 "route_geometry": result.route_geometry,
-                # Echo back the vehicle parameters so the client can render
-                # contextual messages (e.g. "no stops needed") correctly.
+                # Echo back vehicle parameters so the UI can render contextual
+                # messages (e.g. "no stops needed" vs partial-route warning).
                 "tank_range_miles": tank_range_miles,
                 "mpg": mpg,
                 "warning": result.warning,
